@@ -1,13 +1,16 @@
 import React from 'react';
 import { ListMusic } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { songs as allSongs } from '../data/songs';
 import { useAppContext } from '../context/AppContext';
 import './Pages.css';
 
 const Library = () => {
-  const { playlists } = useAppContext();
+  const { songs, isApiLoading, playlists } = useAppContext();
   const navigate = useNavigate();
+
+  if (isApiLoading) {
+    return <main className="main-content library-page"><div style={{color: 'white'}}>Loading library...</div></main>;
+  }
 
   return (
     <main className="main-content library-page">
@@ -26,8 +29,9 @@ const Library = () => {
         ) : (
           <div className="playlists-grid">
             {playlists.map(playlist => {
+              // Convert ID to string for safe comparison with database IDs
               const firstSong = playlist.songs.length > 0 
-                ? allSongs.find(s => s.id === playlist.songs[0])
+                ? songs.find(s => String(s.id) === String(playlist.songs[0]))
                 : null;
                 
               return (

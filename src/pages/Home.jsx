@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
 import SongCard from '../components/SongCard';
-import { songs as allSongs } from '../data/songs';
 import { useAppContext } from '../context/AppContext';
 import '../components/MainContent.css';
 
 const Home = () => {
-  const { currentSong, isPlaying, playSong, searchQuery } = useAppContext();
+  // Pull songs and loading state from your API context
+  const { songs, isApiLoading, currentSong, isPlaying, playSong, searchQuery } = useAppContext();
   const [activeCategory, setActiveCategory] = useState('All');
   
   const categories = ['All', 'Pop', 'Rock', 'Indie', 'Acoustic', 'Rap'];
 
-  const filteredSongs = allSongs.filter(song => {
-    const matchesSearch = song.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          song.artist.toLowerCase().includes(searchQuery.toLowerCase());
+  // Show a loading state while fetching from Render
+  if (isApiLoading) {
+    return <main className="main-content"><div style={{color: 'white', padding: '2rem'}}>Loading songs from database...</div></main>;
+  }
+
+  const filteredSongs = songs.filter(song => {
+    // Add optional chaining (?.) just in case any database field is empty
+    const titleMatch = song.title?.toLowerCase().includes(searchQuery.toLowerCase());
+    const artistMatch = song.artist?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeCategory === 'All' || song.category === activeCategory;
-    return matchesSearch && matchesCategory;
+    
+    return (titleMatch || artistMatch) && matchesCategory;
   });
 
   return (
@@ -57,7 +64,7 @@ const Home = () => {
         <section className="song-section">
           <h2 className="section-title">Trending Now</h2>
           <div className="songs-grid">
-            {allSongs.slice().reverse().map(song => (
+            {songs.slice().reverse().map(song => (
               <SongCard 
                 key={`trending-${song.id}`} 
                 song={song} 

@@ -1,14 +1,20 @@
 import React from 'react';
 import { ThumbsUp } from 'lucide-react';
-import { songs as allSongs } from '../data/songs';
 import { useAppContext } from '../context/AppContext';
 import SongCard from '../components/SongCard';
 import './Pages.css';
 
 const LikedSongs = () => {
-  const { likedSongs, currentSong, isPlaying, playSong } = useAppContext();
+  const { songs, isApiLoading, likedSongs, currentSong, isPlaying, playSong } = useAppContext();
   
-  const likedSongObjects = likedSongs.map(id => allSongs.find(s => s.id === id)).filter(Boolean);
+  if (isApiLoading) {
+    return <main className="main-content library-page"><div style={{color: 'white'}}>Loading liked songs...</div></main>;
+  }
+
+  // Find songs using safe string conversion so it matches database numbers
+  const likedSongObjects = likedSongs
+    .map(id => songs.find(s => String(s.id) === String(id)))
+    .filter(Boolean);
 
   return (
     <main className="main-content library-page">

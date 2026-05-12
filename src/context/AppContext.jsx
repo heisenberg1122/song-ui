@@ -1,11 +1,64 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { songs as allSongs, defaultPlaylists } from '../data/songs';
+// src/context/AppContext.jsx
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
+import { defaultPlaylists } from '../data/songs';
 
 const AppContext = createContext();
 
 export const useAppContext = () => useContext(AppContext);
 
 export const AppProvider = ({ children }) => {
+  const [songs, setSongs] = useState([]);
+  const [isApiLoading, setIsApiLoading] = useState(true);
+
+  // FETCH FROM RENDER API & TRANSLATE DATA
+  useEffect(() => {
+    const fetchSongs = async () => {
+      try {
+        const response = await fetch('https://song-api-8q2h.onrender.com/quiambao/songs');
+        if (!response.ok) throw new Error("Failed to fetch");
+        
+        const backendData = await response.json();
+        
+        // 🔥 TRANSLATE JAVA DATA TO REACT DATA 🔥
+        const translatedSongs = backendData.map(song => {
+          // Extract the YouTube Video ID from the URL to generate the thumbnail
+          let youtubeId = "dQw4w9WgXcQ"; // Fallback video ID
+          
+          if (song.url) {
+            if (song.url.includes("watch?v=")) {
+              youtubeId = song.url.split("watch?v=")[1].split("&")[0];
+            } else if (song.url.includes("youtu.be/")) {
+              youtubeId = song.url.split("youtu.be/")[1].split("?")[0];
+            } else if (song.url.includes("embed/")) {
+              youtubeId = song.url.split("embed/")[1].split("?")[0];
+            }
+          }
+
+          return {
+            id: String(song.id),
+            title: song.title,
+            artist: song.artist,
+            category: song.genre || "Pop", 
+            description: `Album: ${song.album || 'Single'}`,
+            views: "1M", // Fake data since Java DB doesn't have it
+            time: "Recently", 
+            likes: "10K",
+            youtubeUrl: song.url,
+            // Automatically generate the YouTube Thumbnail!
+            imageUrl: `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` 
+          };
+        });
+
+        setSongs(translatedSongs);
+      } catch (error) {
+        console.error("Error fetching songs from API:", error);
+      } finally {
+        setIsApiLoading(false);
+      }
+    };
+    fetchSongs();
+  }, []);
+
   const [currentSong, setCurrentSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [likedSongs, setLikedSongs] = useState([]);
@@ -17,11 +70,31 @@ export const AppProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [notifications, setNotifications] = useState([
-    { id: 1, text: "Welcome to OPM Vibe! Discover the best Filipino music.", isRead: false },
-    { id: 2, text: "New playlist 'Chill Vibes' is ready for you.", isRead: false }
+    { id: 1, text: "Welcome to OPM Vibe! Discover the best Filipino music.", isRead: false }
   ]);
 
-  // Load user from local storage on mount
+  // Player Sync State
+  const [playedSeconds, setPlayedSeconds] = useState(0);
+  const [durationSecs, setDurationSecs] = useState(0);
+  const playerRefs = useRef([]);
+
+  const registerPlayer = useCallback((ref) => {
+    if (ref && !playerRefs.current.includes(ref)) {
+      playerRefs.current.push(ref);
+    }
+  }, []);
+
+  const unregisterPlayer = useCallback((ref) => {
+    playerRefs.current = playerRefs.current.filter(r => r !== ref);
+  }, []);
+
+  const globalSeekTo = useCallback((seconds) => {
+    playerRefs.current.forEach(ref => {
+      if (ref && ref.seekTo) ref.seekTo(seconds, 'seconds');
+    });
+    setPlayedSeconds(seconds);
+  }, []);
+
   useEffect(() => {
     const storedUser = localStorage.getItem('opm_user');
     if (storedUser) {
@@ -58,6 +131,7 @@ export const AppProvider = ({ children }) => {
     } else {
       setCurrentSong(song);
       setIsPlaying(true);
+      setPlayedSeconds(0); 
       addToHistory(song.id);
     }
   };
@@ -69,26 +143,25 @@ export const AppProvider = ({ children }) => {
   };
 
   const nextSong = () => {
-    if (!currentSong) return;
-    const currentIndex = allSongs.findIndex(s => s.id === currentSong.id);
-    const nextIndex = (currentIndex + 1) % allSongs.length;
-    playSong(allSongs[nextIndex]);
+    if (!currentSong || songs.length === 0) return;
+    const currentIndex = songs.findIndex(s => s.id === currentSong.id);
+    const nextIndex = (currentIndex + 1) % songs.length;
+    playSong(songs[nextIndex]);
   };
 
   const prevSong = () => {
-    if (!currentSong) return;
-    const currentIndex = allSongs.findIndex(s => s.id === currentSong.id);
-    const prevIndex = currentIndex === 0 ? allSongs.length - 1 : currentIndex - 1;
-    playSong(allSongs[prevIndex]);
+    if (!currentSong || songs.length === 0) return;
+    const currentIndex = songs.findIndex(s => s.id === currentSong.id);
+    const prevIndex = currentIndex === 0 ? songs.length - 1 : currentIndex - 1;
+    playSong(songs[prevIndex]);
   };
 
-  // State Management
   const toggleLike = (songId) => {
     setLikedSongs(prev => {
       const isLiked = prev.includes(songId);
       if (!isLiked) {
-        const songName = allSongs.find(s => s.id === songId)?.title;
-        addNotification(`Added "${songName}" to Liked Songs`);
+        const songName = songs.find(s => s.id === songId)?.title;
+        if (songName) addNotification(`Added "${songName}" to Liked Songs`);
       }
       return isLiked ? prev.filter(id => id !== songId) : [...prev, songId];
     });
@@ -97,17 +170,13 @@ export const AppProvider = ({ children }) => {
   const addToHistory = (songId) => {
     setHistory(prev => {
       const newHistory = prev.filter(id => id !== songId);
-      return [songId, ...newHistory].slice(0, 50); // Keep last 50
+      return [songId, ...newHistory].slice(0, 50); 
     });
   };
 
   const createPlaylist = (name) => {
     if (!name.trim()) return;
-    const newPlaylist = {
-      id: `p_${Date.now()}`,
-      name,
-      songs: []
-    };
+    const newPlaylist = { id: `p_${Date.now()}`, name, songs: [] };
     setPlaylists([...playlists, newPlaylist]);
     addNotification(`Created new playlist: ${name}`);
   };
@@ -123,6 +192,7 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider value={{
+      songs, isApiLoading, 
       currentSong, isPlaying, playSong, togglePlay, nextSong, prevSong,
       likedSongs, toggleLike,
       history,
@@ -130,7 +200,10 @@ export const AppProvider = ({ children }) => {
       searchQuery, setSearchQuery,
       currentUser, login, logout,
       isAuthModalOpen, setIsAuthModalOpen,
-      notifications, markNotificationsRead
+      notifications, markNotificationsRead,
+      playedSeconds, setPlayedSeconds,
+      durationSecs, setDurationSecs,
+      registerPlayer, unregisterPlayer, globalSeekTo
     }}>
       {children}
     </AppContext.Provider>

@@ -1,39 +1,53 @@
-import React, { useEffect, useState } from 'react';
+// src/pages/Watch.jsx
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ThumbsUp, ThumbsDown, Share2, BookmarkPlus } from 'lucide-react';
 import { songs as allSongs } from '../data/songs';
 import { useAppContext } from '../context/AppContext';
-import SongCard from '../components/SongCard';
 import './Pages.css';
 
 const Watch = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { playSong, likedSongs, toggleLike, currentSong, isPlaying } = useAppContext();
   
+  // Safely grab only the base functions from your original AppContext
+  const { playSong, likedSongs, toggleLike, currentSong } = useAppContext();
+
   const song = allSongs.find(s => s.id === id);
   const isLiked = likedSongs.includes(id);
 
+  // Automatically sync the global "Now Playing" state when you load the page
   useEffect(() => {
     if (song && (!currentSong || currentSong.id !== song.id)) {
       playSong(song);
     }
-  }, [id]);
+  }, [id, song, currentSong, playSong]);
 
   if (!song) {
     return <div className="page-container">Song not found</div>;
   }
+
+  // Convert standard YouTube URL to an Embed URL so the iframe can read it
+  // Example: "https://www.youtube.com/watch?v=123" -> "https://www.youtube.com/embed/123?autoplay=1"
+  const embedUrl = song.youtubeUrl.replace('watch?v=', 'embed/') + '?autoplay=1';
 
   const suggestedSongs = allSongs.filter(s => s.id !== id).slice(0, 8);
 
   return (
     <div className="watch-page">
       <div className="watch-content">
+        
+        {/* Native HTML5 Iframe Embed - Bypasses all React-Player and Vite errors */}
         <div className="video-player-container">
-          <img src={song.imageUrl} alt={song.title} className="video-cover" />
-          <div className="video-overlay glass">
-            <h2>{isPlaying && currentSong?.id === song.id ? 'Now Playing' : 'Paused'}</h2>
-          </div>
+          <iframe 
+            src={embedUrl} 
+            title={song.title}
+            width="100%" 
+            height="100%" 
+            style={{ position: 'absolute', top: 0, left: 0, border: 'none' }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowFullScreen
+          ></iframe>
         </div>
 
         <h1 className="watch-title">{song.title}</h1>

@@ -23,7 +23,7 @@
 
 .watch-content {
   flex: 1;
-  max-width: 1000px;
+  min-width: 0; /* FIX: Removed max-width: 1000px so it stretches to fill the gap */
 }
 
 .video-player-container {

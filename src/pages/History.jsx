@@ -1,14 +1,20 @@
 import React from 'react';
 import { Clock } from 'lucide-react';
-import { songs as allSongs } from '../data/songs';
 import { useAppContext } from '../context/AppContext';
 import SongCard from '../components/SongCard';
 import './Pages.css';
 
 const History = () => {
-  const { history, currentSong, isPlaying, playSong } = useAppContext();
+  const { songs, isApiLoading, history, currentSong, isPlaying, playSong } = useAppContext();
   
-  const historyObjects = history.map(id => allSongs.find(s => s.id === id)).filter(Boolean);
+  if (isApiLoading) {
+    return <main className="main-content library-page"><div style={{color: 'white'}}>Loading history...</div></main>;
+  }
+
+  // Safe matching between local storage strings and database numbers
+  const historyObjects = history
+    .map(id => songs.find(s => String(s.id) === String(id)))
+    .filter(Boolean);
 
   return (
     <main className="main-content library-page">

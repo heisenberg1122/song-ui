@@ -1,22 +1,28 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { Play } from 'lucide-react';
-import { songs as allSongs } from '../data/songs';
 import { useAppContext } from '../context/AppContext';
 import SongCard from '../components/SongCard';
 import './Pages.css';
 
 const Playlist = () => {
   const { id } = useParams();
-  const { playlists, currentSong, isPlaying, playSong } = useAppContext();
+  const { songs, isApiLoading, playlists, currentSong, isPlaying, playSong } = useAppContext();
   
+  if (isApiLoading) {
+    return <main className="main-content playlist-page"><div style={{color: 'white'}}>Loading playlist...</div></main>;
+  }
+
   const playlist = playlists.find(p => p.id === id);
 
   if (!playlist) {
     return <div className="page-container">Playlist not found</div>;
   }
 
-  const playlistSongs = playlist.songs.map(songId => allSongs.find(s => s.id === songId)).filter(Boolean);
+  const playlistSongs = playlist.songs
+    .map(songId => songs.find(s => String(s.id) === String(songId)))
+    .filter(Boolean);
+    
   const firstSong = playlistSongs[0];
 
   const handlePlayAll = () => {
